@@ -1,0 +1,13 @@
+.
+./.streamlit
+./app
+./app/components
+./data
+./data/processed
+./data/raw
+./data/vectorstore
+./models
+./models/lora_weights
+./notebooks
+./scripts
+./tests

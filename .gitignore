@@ -1,0 +1,25 @@
+# Data (download locally, never commit)
+data/raw/
+data/processed/
+data/vectorstore/
+
+# Model weights (publish to HuggingFace, not GitHub)
+models/
+
+# Python
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Outputs
+outputs/
+*.log

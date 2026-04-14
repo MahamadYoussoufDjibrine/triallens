@@ -1,0 +1,14 @@
+{
+  "RAW_DATA_DIR": "data/raw",
+  "PROCESSED_DATA_DIR": "data/processed",
+  "VECTORSTORE_DIR": "data/vectorstore",
+  "MODEL_DIR": "models/lora_weights",
+  "OUTPUT_DIR": "outputs",
+  "OLLAMA_MODEL": "gemma4:27b",
+  "OLLAMA_OCR_MODEL": "gemma4:4b",
+  "EMBEDDING_MODEL": "all-MiniLM-L6-v2",
+  "CLINICALTRIALS_BASE_URL": "https://clinicaltrials.gov/api/v2",
+  "MAX_TRIALS_TO_RETRIEVE": 10,
+  "TOP_K_VECTOR_RESULTS": 20,
+  "SUPPORTED_LANGUAGES": ["en", "pt", "es", "fr"]
+}
