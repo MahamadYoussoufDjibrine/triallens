@@ -1,21 +1,17 @@
 """
-trial_retriever.py
-Retrieves candidate trials using ChromaDB vector similarity + ClinicalTrials.gov API.
+trial_retriever.py - ChromaDB RAG + ClinicalTrials.gov API (fields param removed).
 """
-
 import json
 from pathlib import Path
-
-import chromadb
 import requests
+import chromadb
 from sentence_transformers import SentenceTransformer
 
-
-_model_cache: SentenceTransformer | None = None
+_model_cache = None
 _collection_cache = None
 
 
-def _get_collection(settings: dict):
+def _get_collection(settings):
     global _collection_cache
     if _collection_cache is None:
         vectorstore_dir = settings.get("VECTORSTORE_DIR", "data/vectorstore")
@@ -24,20 +20,18 @@ def _get_collection(settings: dict):
     return _collection_cache
 
 
-def _get_model(settings: dict) -> SentenceTransformer:
+def _get_model(settings):
     global _model_cache
     if _model_cache is None:
         _model_cache = SentenceTransformer(settings.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2"))
     return _model_cache
 
 
-def _vector_search(query: str, settings: dict, top_k: int = 20) -> list[dict]:
+def _vector_search(query, settings, top_k=20):
     model = _get_model(settings)
     collection = _get_collection(settings)
-
     embedding = model.encode(query).tolist()
     results = collection.query(query_embeddings=[embedding], n_results=top_k)
-
     trials = []
     for i, nct_id in enumerate(results["ids"][0]):
         meta = results["metadatas"][0][i]
@@ -56,14 +50,13 @@ def _vector_search(query: str, settings: dict, top_k: int = 20) -> list[dict]:
     return trials
 
 
-def _api_search(condition: str, age: int, sex: str, country: str, max_results: int = 10) -> list[dict]:
-    """Fallback: query ClinicalTrials.gov API directly."""
-    sex_map = {"Female": "FEMALE", "Male": "MALE"}
+def _api_search(condition, age, sex, country, max_results=10):
+    """Live API search — no fields parameter (caused 400 errors)."""
+    # Use only the first part of diagnosis for cleaner search
+    clean_condition = condition.split(".")[0][:60]
     params = {
-        "query.cond": condition,
+        "query.cond": clean_condition,
         "filter.overallStatus": "RECRUITING",
-        "filter.geo": f"distance({country},500mi)",
-        "fields": "NCTId|BriefTitle|OverallStatus|Phase|EligibilityCriteria|LocationCountry",
         "pageSize": max_results,
         "format": "json",
     }
@@ -80,12 +73,13 @@ def _api_search(condition: str, age: int, sex: str, country: str, max_results: i
             proto = s.get("protocolSection", {})
             id_mod = proto.get("identificationModule", {})
             nct_id = id_mod.get("nctId", "")
+            elig = proto.get("eligibilityModule", {}).get("eligibilityCriteria", "")
             results.append({
                 "nct_id": nct_id,
                 "title": id_mod.get("briefTitle", ""),
                 "status": proto.get("statusModule", {}).get("overallStatus", ""),
+                "eligibility_raw": elig,
                 "url": f"https://clinicaltrials.gov/study/{nct_id}",
-                "eligibility_raw": proto.get("eligibilityModule", {}).get("eligibilityCriteria", ""),
                 "_source": "api",
             })
         return results
@@ -94,41 +88,29 @@ def _api_search(condition: str, age: int, sex: str, country: str, max_results: i
         return []
 
 
-def retrieve_trials(
-    diagnosis: str,
-    age: int,
-    sex: str,
-    country: str,
-    lab_data: dict,
-    settings: dict,
-) -> list[dict]:
-    """
-    Retrieve candidate trials via vector search (primary) + API (supplement).
-    Returns up to TOP_K_VECTOR_RESULTS deduplicated trials.
-    """
+def retrieve_trials(diagnosis, age, sex, country, lab_data, settings):
     query = f"Patient: {diagnosis}. Age: {age}. Sex: {sex}. Country: {country}."
     if lab_data:
-        lab_str = ", ".join(f"{k}={v}" for k, v in list(lab_data.items())[:10])
-        query += f" Lab values: {lab_str}."
+        lab_str = ", ".join(f"{k}={v}" for k, v in list(lab_data.items())[:5])
+        query += f" Lab: {lab_str}."
 
     trials = []
 
-    # Primary: vector store (fast, local)
+    # Primary: vector store
     try:
         trials = _vector_search(query, settings, top_k=settings.get("TOP_K_VECTOR_RESULTS", 20))
     except Exception as e:
-        print(f"Vector search failed (vectorstore may not be built yet): {e}")
+        print(f"Vector search failed: {e}")
 
-    # Supplement with live API results
+    # Supplement with live API
     api_results = _api_search(
-        condition=diagnosis.split(".")[0][:100],
+        condition=diagnosis,
         age=age,
         sex=sex,
         country=country,
         max_results=settings.get("MAX_TRIALS_TO_RETRIEVE", 10),
     )
 
-    # Deduplicate by nct_id
     seen = {t["nct_id"] for t in trials}
     for t in api_results:
         if t["nct_id"] not in seen:
