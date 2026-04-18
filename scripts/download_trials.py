@@ -50,7 +50,7 @@ def fetch_page(condition: str, status: str, page_token: str | None, page_size: i
     params = {
         "query.cond": condition,
         "filter.overallStatus": status,
-        "fields": "|".join(FIELDS),
+        # "fields": "|".join(FIELDS),
         "pageSize": page_size,
         "format": "json",
     }
