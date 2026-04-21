@@ -4,7 +4,6 @@ chromadb==0.4.24
 sentence-transformers==2.7.0
 pillow==10.3.0
 python-dotenv==1.0.1
-ollama==0.2.1
 pydantic==2.7.1
 httpx==0.27.0
 pandas==2.2.2

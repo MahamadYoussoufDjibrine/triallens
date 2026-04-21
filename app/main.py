@@ -16,6 +16,17 @@ from components.formatter import format_results
 # Load settings
 SETTINGS = json.loads(Path("SETTINGS.json").read_text())
 
+# Load secrets from Streamlit Cloud or environment
+import streamlit as _st_check
+try:
+    if hasattr(_st_check, 'secrets') and "ANTHROPIC_API_KEY" in _st_check.secrets:
+        SETTINGS["ANTHROPIC_API_KEY"] = _st_check.secrets["ANTHROPIC_API_KEY"]
+except Exception:
+    pass
+if not SETTINGS.get("ANTHROPIC_API_KEY"):
+    import os
+    SETTINGS["ANTHROPIC_API_KEY"] = os.environ.get("ANTHROPIC_API_KEY", "")
+
 st.set_page_config(
     page_title="TrialLens",
     page_icon="🔬",
