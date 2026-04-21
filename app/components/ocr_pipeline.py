@@ -1,15 +1,13 @@
 """
 ocr_pipeline.py
-Extracts structured lab values from an uploaded image using Gemma 4 E4B via Ollama.
+Extracts structured lab values from an uploaded image.
+Uses Ollama locally if available, skips gracefully on Streamlit Cloud.
 """
-
 import base64
 import json
 import re
 from io import BytesIO
-from pathlib import Path
 
-import ollama
 from PIL import Image
 
 
@@ -32,15 +30,20 @@ def image_to_base64(image_file) -> str:
 
 def extract_lab_data(image_file, settings: dict) -> dict:
     """
-    Extract lab values from an uploaded image file using Gemma 4 E4B.
+    Extract lab values from an uploaded image.
     Returns a dict of lab value name → numeric value.
-    Falls back to empty dict on any error.
+    Falls back to empty dict if Ollama not available (e.g. Streamlit Cloud).
     """
-    ocr_model = settings.get("OLLAMA_OCR_MODEL", "gemma4:4b")
+    try:
+        import ollama  # Only available locally
+    except ImportError:
+        print("Ollama not available — skipping OCR (cloud deployment)")
+        return {}
+
+    ocr_model = settings.get("OLLAMA_OCR_MODEL", "gemma3:4b")
 
     try:
         img_b64 = image_to_base64(image_file)
-
         response = ollama.chat(
             model=ocr_model,
             messages=[
@@ -52,15 +55,9 @@ def extract_lab_data(image_file, settings: dict) -> dict:
             ],
             options={"temperature": 0.0},
         )
-
         raw = response["message"]["content"].strip()
-
-        # Strip any markdown fences if present
         raw = re.sub(r"```json|```", "", raw).strip()
-
         lab_data = json.loads(raw)
-
-        # Validate: keep only numeric values
         return {k: float(v) for k, v in lab_data.items() if isinstance(v, (int, float))}
 
     except Exception as e:
